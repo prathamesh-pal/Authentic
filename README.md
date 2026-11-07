@@ -1,68 +1,71 @@
 # FastAPI Authentication API
 
-A complete authentication and authorization system built with **FastAPI**.
+A production-style authentication and authorization backend built with **FastAPI**, **PostgreSQL**, and **JWT**.
 
-This project demonstrates how to design and build a secure, production-style authentication API from scratch — including user registration, password hashing, JWT authentication, protected routes, token handling, and role-based authorization.
+It covers the full path behind a login button: user registration, password hashing, access and refresh tokens, protected routes, and role-based access control.
 
-> Built as a backend engineering project to demonstrate practical authentication, API design, security, and database skills with FastAPI.
+> A backend engineering project demonstrating practical authentication, API design, security fundamentals, and database skills.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Authentication Flow](#authentication-flow)
+- [API Endpoints](#api-endpoints)
+- [Database Model](#database-model)
+- [JWT Details](#jwt-details)
+- [Authorization](#authorization)
+- [Getting Started](#getting-started)
+- [API Documentation](#api-documentation)
+- [Security Considerations](#security-considerations)
+- [What I Learned](#what-i-learned)
+- [Roadmap](#roadmap)
+- [License](#license)
 
 ---
 
 ## Features
 
-### Authentication
+**Authentication**
+- User registration and login
+- Password hashing and verification (Argon2 via Passlib)
+- JWT access tokens with short expiry
+- Refresh token flow
+- Protected routes via FastAPI dependencies
+- Logout endpoint
 
-* User registration
-* User login
-* Password hashing
-* Password verification
-* JWT access tokens
-* Refresh token flow
-* Token expiration
-* Protected API routes
-* Logout / token invalidation
+**Authorization**
+- Role-based access control (`user`, `admin`)
+- Current-user dependency
+- Admin-only routes with permission checks
 
-### Authorization
+**User management**
+- Get and update the current user
+- Change password
+- Account activation / deactivation
+- Unique email validation
 
-* Role-based access control
-* Protected user routes
-* Admin-only routes
-* Current-user dependency
-* Permission checks
-
-### User Management
-
-* Get current authenticated user
-* Update user information
-* Change password
-* Account activation/deactivation
-* Unique email validation
-
-### Security
-
-* Secure password hashing
-* JWT-based authentication
-* Token expiration
-* Protected endpoints
-* Input validation
-* Environment-based secrets
-* CORS configuration
-* Authentication dependencies
+**Security**
+- No plaintext passwords, ever
+- Environment-based secrets
+- Pydantic input validation
+- Configurable CORS
 
 ---
 
 ## Tech Stack
 
-* **Python**
-* **FastAPI**
-* **Pydantic**
-* **SQLAlchemy**
-* **PostgreSQL**
-* **JWT**
-* **Passlib / Argon2**
-* **Uvicorn**
-* **Alembic**
-* **Docker**
+| Layer | Tools |
+| --- | --- |
+| Framework | FastAPI, Uvicorn |
+| Validation | Pydantic |
+| Database | PostgreSQL, SQLAlchemy, Alembic |
+| Auth | JWT, Passlib (Argon2) |
+| Tooling | Docker |
 
 ---
 
@@ -74,28 +77,25 @@ Client
   ▼
 FastAPI
   │
-  ├── Authentication
-  │     ├── Register
-  │     ├── Login
-  │     ├── Access Token
-  │     └── Refresh Token
+  ├── Routes
+  │     ├── /auth    (register, login, refresh, logout)
+  │     ├── /users   (current-user management)
+  │     └── /admin   (admin-only management)
   │
-  ├── Authorization
-  │     ├── User
-  │     └── Admin
+  ├── Dependencies   (token validation, current user, role checks)
   │
-  ├── API Routes
-  │     ├── /auth
-  │     ├── /users
-  │     └── /admin
+  ├── Services       (auth, user management)
   │
-  ├── Services
-  │     ├── Password Hashing
-  │     ├── JWT
-  │     └── User Management
+  ├── Core           (password hashing, JWT, config)
   │
   ▼
 PostgreSQL
+```
+
+Request lifecycle:
+
+```text
+Request → Validation → Authentication → Authorization → Business Logic → Database → Response
 ```
 
 ---
@@ -138,8 +138,6 @@ app/
 
 ### 1. Register
 
-The client sends user credentials:
-
 ```http
 POST /auth/register
 ```
@@ -151,11 +149,7 @@ POST /auth/register
 }
 ```
 
-The password is hashed before being stored in the database.
-
-The plaintext password is never stored.
-
----
+The password is hashed before it is stored. The plaintext password is never saved.
 
 ### 2. Login
 
@@ -163,15 +157,7 @@ The plaintext password is never stored.
 POST /auth/login
 ```
 
-The server:
-
-1. Finds the user
-2. Verifies the password
-3. Creates an access token
-4. Creates a refresh token
-5. Returns the authentication credentials
-
-Example response:
+The server finds the user, verifies the password, and issues an access token and a refresh token:
 
 ```json
 {
@@ -181,32 +167,22 @@ Example response:
 }
 ```
 
----
-
-### 3. Access Protected Routes
-
-The client sends the access token:
+### 3. Access a protected route
 
 ```http
 GET /users/me
 Authorization: Bearer <access_token>
 ```
 
-FastAPI's authentication dependency validates the token and identifies the current user.
+An authentication dependency validates the token and resolves the current user.
 
----
-
-### 4. Refresh Token
-
-When the access token expires:
+### 4. Refresh the access token
 
 ```http
 POST /auth/refresh
 ```
 
-The refresh token can be exchanged for a new access token.
-
-This avoids requiring the user to log in again every time a short-lived access token expires.
+When the short-lived access token expires, the refresh token is exchanged for a new one, so the user doesn't have to log in again.
 
 ---
 
@@ -214,41 +190,39 @@ This avoids requiring the user to log in again every time a short-lived access t
 
 ### Authentication
 
-| Method | Endpoint         | Description          | Auth          |
-| ------ | ---------------- | -------------------- | ------------- |
-| POST   | `/auth/register` | Create account       | No            |
-| POST   | `/auth/login`    | Login                | No            |
-| POST   | `/auth/refresh`  | Refresh access token | Refresh Token |
-| POST   | `/auth/logout`   | Logout               | Yes           |
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| POST | `/auth/register` | Create account | None |
+| POST | `/auth/login` | Log in | None |
+| POST | `/auth/refresh` | Refresh access token | Refresh token |
+| POST | `/auth/logout` | Log out | Required |
 
 ### Users
 
-| Method | Endpoint             | Description      | Auth |
-| ------ | -------------------- | ---------------- | ---- |
-| GET    | `/users/me`          | Get current user | Yes  |
-| PATCH  | `/users/me`          | Update profile   | Yes  |
-| PATCH  | `/users/me/password` | Change password  | Yes  |
-| DELETE | `/users/me`          | Delete account   | Yes  |
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| GET | `/users/me` | Get current user | Required |
+| PATCH | `/users/me` | Update profile | Required |
+| PATCH | `/users/me/password` | Change password | Required |
+| DELETE | `/users/me` | Delete account | Required |
 
 ### Admin
 
-| Method | Endpoint            | Description | Auth  |
-| ------ | ------------------- | ----------- | ----- |
-| GET    | `/admin/users`      | List users  | Admin |
-| GET    | `/admin/users/{id}` | Get user    | Admin |
-| PATCH  | `/admin/users/{id}` | Update user | Admin |
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| GET | `/admin/users` | List users | Admin |
+| GET | `/admin/users/{id}` | Get user | Admin |
+| PATCH | `/admin/users/{id}` | Update user | Admin |
 | DELETE | `/admin/users/{id}` | Delete user | Admin |
 
 ---
 
 ## Database Model
 
-Example `User` model:
-
 ```text
 User
 ├── id
-├── email
+├── email          (unique)
 ├── password_hash
 ├── role
 ├── is_active
@@ -256,15 +230,11 @@ User
 └── updated_at
 ```
 
-Passwords are stored as secure hashes rather than plaintext values.
-
 ---
 
-## JWT Authentication
+## JWT Details
 
-The API uses JWTs to authenticate requests.
-
-A typical access token contains claims such as:
+A typical access token payload:
 
 ```json
 {
@@ -274,273 +244,116 @@ A typical access token contains claims such as:
 }
 ```
 
-The API validates:
-
-* Token signature
-* Token expiration
-* User identity
-* User status
-* Required permissions
+On every protected request the API checks the token signature, expiration, user identity, user status (active), and required permissions.
 
 ---
 
 ## Authorization
 
-Authentication answers:
+Authentication answers **who are you?** Authorization answers **what are you allowed to do?**
 
-> **Who are you?**
-
-Authorization answers:
-
-> **What are you allowed to do?**
-
-For example:
-
-```text
-Authenticated User
-        │
-        ├── GET /users/me       ✓
-        ├── PATCH /users/me     ✓
-        └── GET /admin/users    ✗
-
-Admin
-        │
-        ├── GET /users/me       ✓
-        ├── PATCH /users/me     ✓
-        └── GET /admin/users    ✓
-```
+| Endpoint | User | Admin |
+| --- | :---: | :---: |
+| `GET /users/me` | ✓ | ✓ |
+| `PATCH /users/me` | ✓ | ✓ |
+| `GET /admin/users` | ✗ | ✓ |
 
 ---
 
-## Environment Variables
+## Getting Started
 
-Create a `.env` file:
+### Environment variables
+
+Create a `.env` file (see `.env.example`):
 
 ```env
 DATABASE_URL=postgresql://user:password@localhost/auth_db
-
 SECRET_KEY=your-secret-key
-
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=7
 ```
 
-Never commit secrets or `.env` files to Git.
+> Never commit `.env` files or secrets to Git.
 
----
-
-## Running Locally
-
-### Clone the repository
+### Run locally
 
 ```bash
+# Clone
 git clone https://github.com/yourusername/fastapi-authentication.git
-
 cd fastapi-authentication
-```
 
-### Create a virtual environment
-
-```bash
+# Virtual environment
 python -m venv .venv
-```
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
-Activate it:
-
-```bash
-source .venv/bin/activate
-```
-
-### Install dependencies
-
-```bash
+# Dependencies
 pip install -r requirements.txt
-```
 
-### Configure environment variables
+# Configuration
+cp .env.example .env             # then edit the values
 
-```bash
-cp .env.example .env
-```
+# Database migrations
+alembic upgrade head
 
-Update the values inside `.env`.
-
-### Run the API
-
-```bash
+# Start the API
 uvicorn app.main:app --reload
 ```
 
-The API will be available at:
-
-```text
-http://localhost:8000
-```
+The API runs at `http://localhost:8000`.
 
 ---
 
 ## API Documentation
 
-FastAPI automatically generates interactive API documentation.
+Interactive docs are generated automatically:
 
-### Swagger UI
-
-```text
-http://localhost:8000/docs
-```
-
-### ReDoc
-
-```text
-http://localhost:8000/redoc
-```
-
----
-
-## Example Authentication Flow
-
-```text
-Register
-   │
-   ▼
-POST /auth/register
-   │
-   ▼
-User Created
-   │
-   ▼
-POST /auth/login
-   │
-   ▼
-Access + Refresh Tokens
-   │
-   ▼
-GET /users/me
-   │
-   ▼
-JWT Validation
-   │
-   ▼
-Authenticated User
-```
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
 
 ---
 
 ## Security Considerations
 
-This project focuses on several important authentication concepts:
+- Passwords are hashed before storage and never kept in plaintext
+- Access tokens are short-lived; refresh tokens provide longer sessions
+- Protected routes require valid authentication
+- Role-based authorization blocks unauthorized access
+- Secrets live in environment variables
+- Request data is validated with Pydantic
+- Database access is kept separate from route handlers
 
-* Passwords are never stored directly
-* Password hashing is performed before database storage
-* Access tokens are short-lived
-* Refresh tokens provide longer-lived sessions
-* Protected routes require valid authentication
-* Role-based authorization prevents unauthorized access
-* Secrets are stored through environment variables
-* Request data is validated with Pydantic
-* Database access is separated from API routes
-
-For a production deployment, additional measures may include rate limiting, email verification, password reset flows, token rotation/revocation, audit logging, CSRF protections where applicable, and additional monitoring.
+For production, consider adding rate limiting, email verification, password reset, refresh-token rotation and revocation, audit logging, CSRF protection where applicable, and monitoring.
 
 ---
 
 ## What I Learned
 
-Building this project helped me understand how authentication works beyond simply adding a login form.
+**Backend:** REST API design with FastAPI, dependency injection, Pydantic validation, SQLAlchemy, PostgreSQL, and migrations.
 
-### Backend
+**Security:** password hashing, JWT authentication, access vs. refresh tokens, authentication vs. authorization, RBAC, token expiry, and secret management.
 
-* Designing REST APIs with FastAPI
-* Dependency injection
-* Pydantic validation
-* SQLAlchemy
-* PostgreSQL
-* Database relationships
-* Database migrations
-
-### Security
-
-* Password hashing
-* JWT authentication
-* Access vs refresh tokens
-* Authentication vs authorization
-* Role-based access control
-* Token expiration
-* Secure secret management
-
-### API Design
-
-* HTTP methods and status codes
-* Authentication middleware/dependencies
-* Protected routes
-* Error handling
-* API schemas
-* Separation of concerns
+**API design:** HTTP methods and status codes, authentication dependencies, error handling, schemas, and separation of concerns.
 
 ---
 
-## Project Goals
+## Roadmap
 
-The goal of this project is not to build a frontend authentication page.
-
-The goal is to understand and demonstrate what happens **behind the login button**.
-
-```text
-User
- │
- ▼
-API Request
- │
- ▼
-Validation
- │
- ▼
-Authentication
- │
- ▼
-Authorization
- │
- ▼
-Business Logic
- │
- ▼
-Database
- │
- ▼
-Response
-```
-
----
-
-## Future Improvements
-
-* [ ] Email verification
-* [ ] Forgot/reset password
-* [ ] Refresh-token rotation
-* [ ] Token revocation
-* [ ] Login rate limiting
-* [ ] Account lockout
-* [ ] OAuth2 / Google authentication
-* [ ] Audit logs
-* [ ] Redis-based session/token management
-* [ ] Docker Compose
-* [ ] Automated tests
-* [ ] CI/CD
-* [ ] Production deployment
+- [ ] Email verification
+- [ ] Forgot / reset password
+- [ ] Refresh-token rotation
+- [ ] Token revocation
+- [ ] Login rate limiting
+- [ ] Account lockout
+- [ ] OAuth2 / Google sign-in
+- [ ] Audit logs
+- [ ] Redis-based session/token management
+- [ ] Docker Compose
+- [ ] Automated tests
+- [ ] CI/CD
+- [ ] Production deployment
 
 ---
 
 ## License
 
-This project is open source and available under the MIT License.
-
-```
-
-### Portfolio positioning
-
-For your portfolio, I’d describe it as:
-
-> **FastAPI Authentication API** — A production-style authentication and authorization backend implementing JWT access/refresh tokens, secure password hashing, protected routes, role-based access control, PostgreSQL, and API validation.
-
-That makes it clear that the project is specifically demonstrating **backend engineering + security fundamentals**, rather than pretending it is a complete SaaS application.
-```
+Released under the [MIT License](LICENSE).
